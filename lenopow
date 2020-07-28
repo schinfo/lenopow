@@ -1,92 +1,113 @@
 #!/usr/bin/env bash
 
-# TODO: Arguments parsing is done manually
-# TODO: Script accepts extra arguments
+# Maintainer: Helmut Stult <helmut[at]manjaro[dot]org>
 
-function _print_usage() {
-	echo "Usage:"
-	echo -e "\t${0} enable|disable|status [acpi|lenovo]"
+# Based on the code from:
+# Lenovsky    <lenovsky@pm.me>
+
+readonly VERSION=1.0.1
+readonly BATTERY_PROTECTION='/sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode'
+readonly BATTERY_PROTECTION_ON=1
+readonly BATTERY_PROTECTION_OFF=0
+
+usage() {
+    # Prints general usage of the script.
+
+    cat <<EOF
+    usage: ${0##*/} [operation]
+    operations:
+    -h, --help        Show this message.
+    -v, --version     Show script version.
+    -s, --status      Show battery protection status.
+    -e, --enable      Enable battery protection (charge level 55-60%).
+    -d, --disable     Disable battery protection (charge level 100%).
+EOF
 }
 
-function _acpi() {
-	# TODO: Make sure acpi module is loaded
-	# TODO: Handle values different than 3 and 5
-	_command="${1}"
-	if [ "${_command}" == "enable" ]
-	then
-		sudo bash -c "echo '\_SB.PCI0.LPCB.EC0.VPC0.SBMC 3' > /proc/acpi/call"
-	elif [ "${_command}" == "disable" ]
-	then
-		sudo bash -c "echo '\_SB.PCI0.LPCB.EC0.VPC0.SBMC 5' > /proc/acpi/call"
-	elif [ "${_command}" == "status" ]
-	then
-		# TODO: Implement status command
-		echo "status command is not currently implemented for module acpi."
-		return 1
-	else
-		return 1
-	fi
+die() {
+    # Raises an error message and exits.
+    # param: $1: $error_message: error message
+
+    local exit_code=1
+    local error_message="$1"
+
+    echo "${0##*/}: ${error_message}" 1>&2
+
+    exit "${exit_code}"
 }
 
-function _lenovo() {
-	# TODO: Make sure lenovo module is loaded
-	# TODO: Make sure VPC2004:00 exists
-	_command="${1}"
-	if [ "${_command}" == "enable" ]
-	then
-		# TODO: Don't enable conservation mode if it's already enabled
-		sudo bash -c "echo 1 > /sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode"
-	elif [ "${_command}" == "disable" ]
-	then
-		# TODO: Don't disable conservation mode if it's already disabled
-		sudo bash -c "echo 0 > /sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode"
-	elif [ "${_command}" == "status" ]
-	then
-		_status_value="$( cat /sys/bus/platform/drivers/ideapad_acpi/VPC2004:00/conservation_mode )"
-		if [ "${_status_value}" == "1" ]
-		then
-			echo "Battery conservation mode is currently enabled."
-		elif [ "${_status_value}" == "0" ]
-		then
-			echo "Battery conservation mode is currently disabled."
-		else
-			echo "Error reading battery conservation mode status."
-		fi
-	else
-		return 1
-	fi
+root_check() {
+    # Checks if the script is called as root,
+    # if not raises an error message and dies.
+
+    [[ "$EUID" -ne 0 ]] &&
+        die 'You cannot perform this operation unless you are root.'
 }
 
-if [ "${1}" == "enable" ]
-then
-	_command="enable"
-elif [ "${1}" == "disable" ]
-then
-	_command="disable"
-elif [ "${1}" == "status" ]
-then
-	_command="status"
-else
-	_print_usage
-	exit 1
-fi
+battery_protection_show() {
+    # Shows battery protection status based on $BATTERY_PROTECTION value.
 
-if [ "${2}" == "acpi" ]
-then
-	_module="acpi"
-elif [ "${2}" == "lenovo" ] ||
-	[ -z "${2}" ]
-then
-	_module="lenovo"
-else
-	_print_usage
-	exit 1
-fi
+    local status="$(cat "${BATTERY_PROTECTION}")"
 
-if [ "${_module}" == "acpi" ]
-then
-	_acpi "${_command}"
-elif [ "${_module}" == "lenovo" ]
-then
-	_lenovo "${_command}"
-fi
+    if [[ "${status}" -eq "${BATTERY_PROTECTION_ON}" ]]; then
+        echo "Battery protection: ENABLED"
+    elif [[ "${status}" -eq "${BATTERY_PROTECTION_OFF}" ]]; then
+        echo "Battery protection: DISABLED"
+    else
+        echo "Battery protection: UNKNOWN"
+    fi
+}
+
+battery_protection_store() {
+    # Stores value in $BATTERY_PROTECTION
+    # param: $1: $store: values for $BATTERY_PROTECTION, where:
+    #   * 1 -> enabled
+    #	* 0 -> disabled
+
+    local store="$1"
+
+    if [[ "${store}" -eq "${BATTERY_PROTECTION_ON}" ]]; then
+        echo 'Battery protection enabled (charge level 55-60%)'
+        echo "${store}" >"${BATTERY_PROTECTION}"
+    elif [[ "${store}" -eq "${BATTERY_PROTECTION_OFF}" ]]; then
+        echo 'Battery protection disabled (charge level 100%)'
+        echo "${store}" >"${BATTERY_PROTECTION}"
+    else
+        die "Invalid value encountered in 'battery_protection_store()'"
+    fi
+}
+
+main() {
+    # Parses command-line arguments in order to perform the stuff.
+    # param: $1: $key: key to the stuff
+
+    local key="$1"
+
+    case "${key}" in
+    -h | --help)
+        usage
+        ;;
+    -v | --version)
+        echo "${0##*/} v${VERSION}"
+        ;;
+    -s | --status)
+        battery_protection_show
+        ;;
+    -e | --enable)
+        root_check
+        battery_protection_store "${BATTERY_PROTECTION_ON}"
+        ;;
+    -d | --disable)
+        root_check
+        battery_protection_store "${BATTERY_PROTECTION_OFF}"
+        ;;
+    "")
+        die "No operation specified. See '${0##*/} --help'."
+        ;;
+    *)
+        die "Invaild operation '${key}'. See '${0##*/} --help'."
+        ;;
+    esac
+}
+
+main "$@"
