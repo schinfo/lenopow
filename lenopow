@@ -54,7 +54,7 @@ battery_protection_store() {
     # Stores value in $BATTERY_PROTECTION
     # param: $1: $store: values for $BATTERY_PROTECTION, where:
     #   * 1 -> enabled
-    #	* 0 -> disabled
+    #   * 0 -> disabled
 
     local store="$1"
 
