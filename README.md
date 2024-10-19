@@ -31,11 +31,11 @@ Run: `lenopow [operation]`
 
 | Operation        | Description                                              |
 | :--------------- | :------------------------------------------------------- |
-| `-h`, `--help`     |  Show help message.                                      |
-| `-v`, `--version`  |  Show script version.                                    |
-| `-s`, `--status`   |  Show battery protection status.                         |
-| `-e`, `--enable`   |  Enable battery protection (charge level 55-60%).        |
-| `-d`, `--disable`  |  Disable battery protection (charge level 100%).         |
+| `-h`, `--help`     |  Show help message.                   v                  |
+| `-v`, `--version`  |  Show the version of the script.                         |
+| `-s`, `--status`   |  Show the current battery protection status.             |
+| `-e`, `--enable`   |  Enable the battery protection (charge level 55-60%).    |
+| `-d`, `--disable`  |  Disable the battery protection (charge level 100%).     |
 
 
 ## License
